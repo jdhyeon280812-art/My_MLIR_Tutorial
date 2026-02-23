@@ -1,4 +1,4 @@
-#include "MulToAdd.h"
+#include "Transform/Arith/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -104,15 +104,24 @@ struct PeelFromMul :
   }
 };
 
-void MulToAddPass::runOnOperation() {
-    // 1. 패턴들을 담을 바구니(Set)를 만듭니다.
-    mlir::RewritePatternSet patterns(&getContext());
-    // 2. 위에서 정의한 두 가지 패턴을 바구니에 넣습니다.
-    patterns.add<PowerOfTwoExpand>(&getContext());
-    patterns.add<PeelFromMul>(&getContext());
-    // 3. 현재 함수(getOperation) 내의 모든 연산에 대해 
-    //    탐욕적(Greedy)으로 패턴 매칭 및 재작성을 수행합니다.
-    (void)applyPatternsGreedily(getOperation(), std::move(patterns));
+#define GEN_PASS_DEF_MULTOADD
+#include "ArithPasses.h.inc"
+
+// ✅ Passes.h(TableGen)에서 선언된 베이스 클래스를 여기서 바로 상속받아 구현합니다.
+struct MulToAddPass : public impl::MulToAddBase<MulToAddPass> {
+  using MulToAddBase::MulToAddBase;
+
+  void runOnOperation() override {
+      mlir::RewritePatternSet patterns(&getContext());
+      patterns.add<PowerOfTwoExpand>(&getContext());
+      patterns.add<PeelFromMul>(&getContext());
+      (void)applyPatternsGreedily(getOperation(), std::move(patterns));
+  }
+};
+
+// 생성 함수 구현
+std::unique_ptr<mlir::Pass> createMulToAddPass() {
+  return std::make_unique<MulToAddPass>();
 }
 
 } // namespace tutorial

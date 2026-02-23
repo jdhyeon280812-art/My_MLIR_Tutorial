@@ -1,6 +1,6 @@
 #include "Transform/Affine/Passes.h"
 #include "Dialect/Poly/PolyDialect.h"
-#include "Transform/Arith/MulToAdd.h"
+#include "Transform/Arith/Passes.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
  // ✅ 새로운 방식 (TableGen이 Passes.h.inc 안에 만들어둔 등록 함수 호출)
   mlir::tutorial::registerAffineFullUnroll();
   mlir::tutorial::registerAffineFullUnrollPatternRewrite();
-  mlir::PassRegistration<mlir::tutorial::MulToAddPass>();
+  mlir::tutorial::registerMulToAddPass();
   
   // ✅ 패스 등록 (이 한 줄이면 Passes.h에 정의된 모든 패스가 한 번에 등록됩니다!)
     mlir::tutorial::registerAffineFullUnroll();

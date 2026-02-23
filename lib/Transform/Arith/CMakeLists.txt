@@ -1,3 +1,8 @@
+set(LLVM_TARGET_DEFINITIONS Passes.td)
+mlir_tablegen(ArithPasses.h.inc -gen-pass-decls -name Arith)
+mlir_tablegen(ArithPasses.md -gen-pass-doc)
+add_public_tablegen_target(ArithPassesIncGen)
+
 add_mlir_library(MulToAdd
   MulToAdd.cpp
 
@@ -10,4 +15,12 @@ add_mlir_library(MulToAdd
   MLIRFuncDialect
   MLIRPass
   MLIRTransforms
+)
+
+#add_dependencies(MulToAdd ArithPassIncGen)
+
+# Include 경로 설정 (.inc 파일 인식용)
+target_include_directories(MulToAdd PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
