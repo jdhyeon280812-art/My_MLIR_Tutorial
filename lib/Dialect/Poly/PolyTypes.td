@@ -6,7 +6,7 @@ include "mlir/IR/AttrTypeBase.td"
 
 // A base class for all types in this dialect
 class Poly_Type<string name, string typeMnemonic> : TypeDef<Poly_Dialect, name> {
-  let mnemonic = typeMnemonic;
+  let mnemonic = typeMnemonic; // 앞으로 MLIR 코드에서 이 타입은 !poly.poly 로 표기
 }
 
 def Polynomial : Poly_Type<"Polynomial", "poly"> {
