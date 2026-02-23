@@ -19,11 +19,16 @@ include_directories(${MLIR_INCLUDE_DIRS})
 
 # TableGen으로 dialect 헤더/소스 자동 생성
 set(LLVM_TARGET_DEFINITIONS PolyDialect.td)
+set(LLVM_TARGET_DEFINITIONS PolyTypes.td)
 
 mlir_tablegen(PolyDialect.h.inc   -gen-dialect-decls)
 mlir_tablegen(PolyDialect.cpp.inc -gen-dialect-defs)
 
+mlir_tablegen(PolyTypes.h.inc   -gen-typedef-decls)
+mlir_tablegen(PolyTypes.cpp.inc -gen-typedef-defs)
+
 add_public_tablegen_target(PolyDialectIncGen)
+add_public_tablegen_target(PolyTypesIncGen)
 
 # Poly 라이브러리 (add_mlir_dialect_library 사용 추천)
 add_mlir_dialect_library(Poly
@@ -31,7 +36,7 @@ add_mlir_dialect_library(Poly
 
     DEPENDS
     PolyDialectIncGen
-
+    PolyTypesIncGen
     LINK_LIBS PUBLIC
     MLIRIR
 )
