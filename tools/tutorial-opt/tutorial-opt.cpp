@@ -4,12 +4,14 @@
 #include "mlir/InitAllDialects.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
+#include "mlir/InitAllPasses.h"
 
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
   registry.insert<mlir::tutorial::poly::PolyDialect>();
   mlir::registerAllDialects(registry);  // 모든 built-in MLIR dialect(affine, arith, func, llvm, ...) 등록
+  mlir::registerAllPasses();
 
  // ✅ 새로운 방식 (TableGen이 Passes.h.inc 안에 만들어둔 등록 함수 호출)
   mlir::tutorial::registerAffineFullUnroll();
