@@ -1,4 +1,5 @@
 // RUN: tutorial-opt --sccp %s | FileCheck %s
+// RUN: tutorial-opt --canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @test_arith_sccp
 func.func @test_arith_sccp() -> i32 {
