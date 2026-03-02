@@ -22,11 +22,20 @@ void PolyDialect::initialize() {
   #define GET_TYPEDEF_LIST
   #include "PolyTypes.cpp.inc"
       >();
-    addOperations<
+  addOperations<
   #define GET_OP_LIST
   #include "PolyOps.cpp.inc"
       >();
 }
+
+Operation *PolyDialect::materializeConstant(OpBuilder &builder, Attribute value,
+                                            Type type, Location loc) {
+  auto coeffs = dyn_cast<DenseIntElementsAttr>(value);
+  if (!coeffs)
+    return nullptr;
+  return builder.create<ConstantOp>(loc, type, coeffs);
+}
+
 
 }  // namespace poly
 }  // namespace tutorial

@@ -38,7 +38,7 @@ add_public_tablegen_target(PolyOpsIncGen)
 # Poly 라이브러리 (add_mlir_dialect_library 사용 추천)
 add_mlir_dialect_library(Poly
     PolyDialect.cpp
-
+    PolyOps.cpp
     DEPENDS
     PolyDialectIncGen
     PolyTypesIncGen
