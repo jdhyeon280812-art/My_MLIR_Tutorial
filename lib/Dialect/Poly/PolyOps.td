@@ -6,6 +6,7 @@ include "PolyDialect.td"
 include "PolyTypes.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
+include "mlir/IR/BuiltinAttributes.td"
 
 // Type constraint for poly binop arguments: polys, vectors of polys, or
 // tensors of polys.
