@@ -17,6 +17,10 @@ tool_relpaths = [
     "mlir_tutorial/tools",
 ]
 # 4. (선택사항) 만약 PATH 설정이 귀찮다면 여기서 강제로 지정할 수도 있습니다.
-# import os
-# config.environment['PATH'] = "/Users/jeongdonghyeon/llvm-project/build/bin:" + os.environ['PATH']
+import os
+config.environment['PATH'] = (
+    "/home/donghyeon/my_tutorial/build/tools/tutorial-opt:" + 
+    "/home/donghyeon/llvm-project/build/bin:" + 
+    os.environ.get('PATH', '')
+)
 
