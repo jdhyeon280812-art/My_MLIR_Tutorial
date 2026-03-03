@@ -1,1 +1,2 @@
-3.263378e-02 Ch07/poly_fold.mlir
+7.460117e-03 Ch07/poly_fold.mlir
+8.345842e-03 Ch07/sccp.mlir
