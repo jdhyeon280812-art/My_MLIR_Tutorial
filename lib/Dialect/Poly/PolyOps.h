@@ -3,6 +3,7 @@
 
 #include "PolyDialect.h"
 #include "PolyTypes.h"
+#include "PolyTraits.h"
 #include "mlir/IR/BuiltinOps.h"    // from @llvm-project
 #include "mlir/IR/BuiltinTypes.h"  // from @llvm-project
 #include "mlir/IR/Dialect.h"       // from @llvm-project
