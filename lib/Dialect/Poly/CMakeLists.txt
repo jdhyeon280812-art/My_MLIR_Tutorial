@@ -48,6 +48,7 @@ add_mlir_dialect_library(Poly
     PolyDialectIncGen
     PolyTypesIncGen
     PolyOpsIncGen
+    PolyCanonicalizeIncGen
     LINK_LIBS PUBLIC
     MLIRIR
 )
