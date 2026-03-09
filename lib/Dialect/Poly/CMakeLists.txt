@@ -35,6 +35,11 @@ mlir_tablegen(PolyOps.h.inc   -gen-op-decls)
 mlir_tablegen(PolyOps.cpp.inc -gen-op-defs)
 add_public_tablegen_target(PolyOpsIncGen)
 
+# --- 4. pattern 생성 ---
+set(LLVM_TARGET_DEFINITIONS PolyPatterns.td)
+mlir_tablegen(PolyPatterns.cpp.inc -gen-rewriters)
+add_public_tablegen_target(PolyPatternsIncGen)
+
 # Poly 라이브러리 (add_mlir_dialect_library 사용 추천)
 add_mlir_dialect_library(Poly
     PolyDialect.cpp
