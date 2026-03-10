@@ -27,13 +27,17 @@ class PolyToStandardTypeConverter : public TypeConverter {
       return RankedTensorType::get({degreeBound}, elementTy);
     });
 
-    // We don't include any custom materialization hooks because this lowering
-    // is all done in a single pass. The dialect conversion framework works by
-    // resolving intermediate (mid-pass) type conflicts by inserting
-    // unrealized_conversion_cast ops, and only converting those to custom
-    // materializations if they persist at the end of the pass. In our case,
-    // we'd only need to use custom materializations if we split this lowering
-    // across multiple passes.
+     // Convert from a tensor type to a poly type: use from_tensor
+    addSourceMaterialization([](OpBuilder &builder, Type type,
+                                ValueRange inputs, Location loc) -> Value {
+      return builder.create<poly::FromTensorOp>(loc, type, inputs[0]);
+    });
+
+    // Convert from a poly type to a tensor type: use to_tensor
+    addTargetMaterialization([](OpBuilder &builder, Type type,
+                                ValueRange inputs, Location loc) -> Value {
+      return builder.create<poly::ToTensorOp>(loc, type, inputs[0]);
+    });
   }
 };
 
@@ -52,23 +56,6 @@ struct ConvertAdd : public OpConversionPattern<AddOp> {
     return success();
   }
 };
-
-struct ConvertSub : public OpConversionPattern<SubOp> {
-  ConvertSub(mlir::MLIRContext *context)
-      : OpConversionPattern<SubOp>(context) {}
-
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      SubOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    arith::SubIOp subOp = rewriter.create<arith::SubIOp>(
-        op.getLoc(), adaptor.getLhs(), adaptor.getRhs());
-    rewriter.replaceOp(op.getOperation(), subOp.getOperation());
-    return success();
-  }
-};
-
 
 struct ConvertMul : public OpConversionPattern<MulOp> {
   ConvertMul(mlir::MLIRContext *context)
@@ -258,12 +245,13 @@ struct PolyToStandard : impl::PolyToStandardBase<PolyToStandard> {
     
     ConversionTarget target(*context);
     target.addLegalDialect<arith::ArithDialect>();
-    target.addIllegalDialect<PolyDialect>();// 이 패스가 끝난 직후에 poly 연산이 단 하나라도 남아있으면 그것은 문법적 오류(Illegal)로 간주
+    //target.addIllegalDialect<PolyDialect>();// 이 패스가 끝난 직후에 poly 연산이 단 하나라도 남아있으면 그것은 문법적 오류(Illegal)로 간주
+    target.addIllegalOp<AddOp, MulOp, EvalOp, ConstantOp, EvalOp, FromTensorOp, ToTensorOp>();
 
     RewritePatternSet patterns(context);
     PolyToStandardTypeConverter typeConverter(context);
-    patterns.add<ConvertAdd, ConvertConstant, ConvertSub, ConvertEval,
-                 ConvertMul, ConvertFromTensor, ConvertToTensor>(typeConverter, context);
+    patterns.add<ConvertAdd, ConvertConstant, ConvertEval, ConvertMul,
+                 ConvertFromTensor, ConvertToTensor>(typeConverter, context);
 
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
