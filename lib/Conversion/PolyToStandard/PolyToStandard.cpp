@@ -27,6 +27,7 @@ class PolyToStandardTypeConverter : public TypeConverter {
       return RankedTensorType::get({degreeBound}, elementTy);
     });
 
+    
      // Convert from a tensor type to a poly type: use from_tensor
     addSourceMaterialization([](OpBuilder &builder, Type type,
                                 ValueRange inputs, Location loc) -> Value {
@@ -38,6 +39,7 @@ class PolyToStandardTypeConverter : public TypeConverter {
                                 ValueRange inputs, Location loc) -> Value {
       return builder.create<poly::ToTensorOp>(loc, type, inputs[0]);
     });
+    
   }
 };
 
@@ -53,6 +55,22 @@ struct ConvertAdd : public OpConversionPattern<AddOp> {
     arith::AddIOp addOp = rewriter.create<arith::AddIOp>(
         op.getLoc(), adaptor.getLhs(), adaptor.getRhs());
     rewriter.replaceOp(op.getOperation(), addOp.getOperation());
+    return success();
+  }
+};
+
+struct ConvertSub : public OpConversionPattern<SubOp> {
+  ConvertSub(mlir::MLIRContext *context)
+      : OpConversionPattern<SubOp>(context) {}
+
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      SubOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    arith::SubIOp subOp = rewriter.create<arith::SubIOp>(
+        op.getLoc(), adaptor.getLhs(), adaptor.getRhs());
+    rewriter.replaceOp(op.getOperation(), subOp.getOperation());
     return success();
   }
 };
@@ -228,10 +246,23 @@ struct ConvertConstant : public OpConversionPattern<ConstantOp> {
       ConstantOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     ImplicitLocOpBuilder b(op.getLoc(), rewriter);
-    auto constOp = b.create<arith::ConstantOp>(adaptor.getCoefficients());
+    
+    // null 체크 추가
+    auto coefficients = adaptor.getCoefficients();
+    if (!coefficients) {
+      return rewriter.notifyMatchFailure(op, "coefficients attribute is null");
+    }
+    // DenseIntElementsAttr 타입 체크 추가
+    auto denseAttr = dyn_cast<DenseIntElementsAttr>(coefficients);
+    if (!denseAttr) {
+      return rewriter.notifyMatchFailure(
+          op, "coefficients is not DenseIntElementsAttr");
+    }
+    auto constOp = b.create<arith::ConstantOp>(denseAttr);
     auto fromTensorOp =
         b.create<FromTensorOp>(op.getResult().getType(), constOp);
     rewriter.replaceOp(op, fromTensorOp.getResult());
+    
     return success();
   }
 };
@@ -246,12 +277,12 @@ struct PolyToStandard : impl::PolyToStandardBase<PolyToStandard> {
     ConversionTarget target(*context);
     target.addLegalDialect<arith::ArithDialect>();
     //target.addIllegalDialect<PolyDialect>();// 이 패스가 끝난 직후에 poly 연산이 단 하나라도 남아있으면 그것은 문법적 오류(Illegal)로 간주
-    target.addIllegalOp<AddOp, MulOp, EvalOp, ConstantOp, EvalOp, FromTensorOp, ToTensorOp>();
+    target.addIllegalOp<AddOp, SubOp, MulOp, ConstantOp, EvalOp, FromTensorOp, ToTensorOp>();
 
     RewritePatternSet patterns(context);
     PolyToStandardTypeConverter typeConverter(context);
-    patterns.add<ConvertAdd, ConvertConstant, ConvertEval, ConvertMul,
-                 ConvertFromTensor, ConvertToTensor>(typeConverter, context);
+    patterns.add<ConvertAdd, ConvertConstant, ConvertSub, ConvertEval,
+                 ConvertMul, ConvertFromTensor, ConvertToTensor>(typeConverter, context);
 
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
