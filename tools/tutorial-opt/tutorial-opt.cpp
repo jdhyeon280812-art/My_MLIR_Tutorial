@@ -6,7 +6,13 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 #include "mlir/InitAllPasses.h"
+#include "mlir/Transforms/Passes.h"
 
+void polyToLLVMPipelineBuilder(mlir::OpPassManager &manager) {
+  // Poly
+  manager.addPass(mlir::tutorial::poly::createPolyToStandard());
+  manager.addPass(mlir::createCanonicalizerPass());
+}
 
 int main(int argc, char **argv) {
   mlir::DialectRegistry registry;
@@ -25,6 +31,10 @@ int main(int argc, char **argv) {
 
   // Dialect conversion passes
   mlir::tutorial::poly::registerPolyToStandardPass();
+
+  mlir::PassPipelineRegistration<>("poly-to-llvm",
+                             "Run passes to lower the poly dialect to LLVM",
+                             polyToLLVMPipelineBuilder);
 
   // 메인 엔진(MlirOptMain) 실행 -> 파일 읽기, 파싱, 에러 처리, 결과 출력 등 컴파일러의 복잡한 뒷단 작업을 MLIR 프레임워크에게 위임. 우리는 패스만 만들어서 등록하면 됨
   return mlir::asMainReturnCode(
