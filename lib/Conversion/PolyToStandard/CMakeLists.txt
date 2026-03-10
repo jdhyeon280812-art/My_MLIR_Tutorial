@@ -30,6 +30,8 @@ add_mlir_dialect_library(PolyToStandard
     MLIRArithDialect
     MLIRTensorDialect
     MLIRTransforms
+    MLIRFuncDialect
+    MLIRFuncTransforms
 )
 
 # 생성된 .inc 파일과 현재 소스 디렉토리를 Include 경로에 추가

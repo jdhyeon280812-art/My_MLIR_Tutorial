@@ -3,6 +3,8 @@
 #include "Dialect/Poly/PolyOps.h"
 #include "Dialect/Poly/PolyTypes.h"
 #include "mlir/Transforms/DialectConversion.h"  // from @llvm-project
+#include "mlir/Dialect/Func/IR/FuncOps.h"  // from @llvm-project
+#include "mlir/Dialect/Func/Transforms/FuncConversions.h"  // from @llvm-project
 
 namespace mlir {
 namespace tutorial {
@@ -63,6 +65,30 @@ struct PolyToStandard : impl::PolyToStandardBase<PolyToStandard> {
     RewritePatternSet patterns(context);
     PolyToStandardTypeConverter typeConverter(context);
     patterns.add<ConvertAdd>(typeConverter, context);
+
+    populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
+        patterns, typeConverter);
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
+      return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+             typeConverter.isLegal(&op.getBody());
+    });
+
+    populateReturnOpTypeConversionPattern(patterns, typeConverter);
+    target.addDynamicallyLegalOp<func::ReturnOp>(
+        [&](func::ReturnOp op) { return typeConverter.isLegal(op); });
+
+    populateCallOpTypeConversionPattern(patterns, typeConverter);
+    target.addDynamicallyLegalOp<func::CallOp>(
+        [&](func::CallOp op) { return typeConverter.isLegal(op); });
+
+    populateBranchOpInterfaceTypeConversionPattern(patterns, typeConverter);
+    target.markUnknownOpDynamicallyLegal([&](Operation *op) {
+      return isNotBranchOpInterfaceOrReturnLikeOp(op) ||
+             isLegalForBranchOpInterfaceTypeConversionPattern(op,
+                                                              typeConverter) ||
+             isLegalForReturnOpTypeConversionPattern(op, typeConverter);
+    });
+
 
     if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
       signalPassFailure();
