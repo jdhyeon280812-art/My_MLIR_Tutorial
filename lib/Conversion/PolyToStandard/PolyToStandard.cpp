@@ -7,6 +7,7 @@
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"  // from @llvm-project
 #include "mlir/IR/ImplicitLocOpBuilder.h"  // from @llvm-project
 #include "llvm/ADT/SmallVector.h"          // from @llvm-project
+#include "mlir/Dialect/SCF/IR/SCF.h"        // from @llvm-project
 
 namespace mlir {
 namespace tutorial {
@@ -64,6 +65,118 @@ struct ConvertSub : public OpConversionPattern<SubOp> {
     arith::SubIOp subOp = rewriter.create<arith::SubIOp>(
         op.getLoc(), adaptor.getLhs(), adaptor.getRhs());
     rewriter.replaceOp(op.getOperation(), subOp.getOperation());
+    return success();
+  }
+};
+
+
+struct ConvertMul : public OpConversionPattern<MulOp> {
+  ConvertMul(mlir::MLIRContext *context)
+      : OpConversionPattern<MulOp>(context) {}
+
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      MulOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto polymulTensorType = cast<RankedTensorType>(adaptor.getLhs().getType());
+    auto numTerms = polymulTensorType.getShape()[0];
+    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+
+    // Create an all-zeros tensor to store the result
+    auto polymulResult = b.create<arith::ConstantOp>(
+        polymulTensorType, DenseElementsAttr::get(polymulTensorType, 0));
+
+    // Loop bounds and step.
+    auto lowerBound =
+        b.create<arith::ConstantOp>(b.getIndexType(), b.getIndexAttr(0));
+    auto numTermsOp =
+        b.create<arith::ConstantOp>(b.getIndexType(), b.getIndexAttr(numTerms));
+    auto step =
+        b.create<arith::ConstantOp>(b.getIndexType(), b.getIndexAttr(1));
+
+    auto p0 = adaptor.getLhs();
+    auto p1 = adaptor.getRhs();
+
+    // for i = 0, ..., N-1
+    //   for j = 0, ..., N-1
+    //     product[i+j (mod N)] += p0[i] * p1[j]
+    auto outerLoop = b.create<scf::ForOp>(
+        lowerBound, numTermsOp, step, ValueRange(polymulResult.getResult()),
+        [&](OpBuilder &builder, Location loc, Value p0Index,
+            ValueRange loopState) {
+          ImplicitLocOpBuilder b(op.getLoc(), builder);
+          auto innerLoop = b.create<scf::ForOp>(
+              lowerBound, numTermsOp, step, loopState,
+              [&](OpBuilder &builder, Location loc, Value p1Index,
+                  ValueRange loopState) {
+                ImplicitLocOpBuilder b(op.getLoc(), builder);
+                auto accumTensor = loopState.front();
+                auto destIndex = b.create<arith::RemUIOp>(
+                    b.create<arith::AddIOp>(p0Index, p1Index), numTermsOp);
+                auto mulOp = b.create<arith::MulIOp>(
+                    b.create<tensor::ExtractOp>(p0, ValueRange(p0Index)),
+                    b.create<tensor::ExtractOp>(p1, ValueRange(p1Index)));
+                auto result = b.create<arith::AddIOp>(
+                    mulOp, b.create<tensor::ExtractOp>(accumTensor,
+                                                       destIndex.getResult()));
+                auto stored = b.create<tensor::InsertOp>(result, accumTensor,
+                                                         destIndex.getResult());
+                b.create<scf::YieldOp>(stored.getResult());
+              });
+
+          b.create<scf::YieldOp>(innerLoop.getResults());
+        });
+
+    rewriter.replaceOp(op, outerLoop.getResult(0));
+    return success();
+  }
+};
+
+struct ConvertEval : public OpConversionPattern<EvalOp> {
+  ConvertEval(mlir::MLIRContext *context)
+      : OpConversionPattern<EvalOp>(context) {}
+
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      EvalOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto polyTensorType =
+        cast<RankedTensorType>(adaptor.getPolynomial().getType());
+    auto numTerms = polyTensorType.getShape()[0];
+    ImplicitLocOpBuilder b(op.getLoc(), rewriter);
+
+    auto lowerBound =
+        b.create<arith::ConstantOp>(b.getIndexType(), b.getIndexAttr(1));
+    auto numTermsOp = b.create<arith::ConstantOp>(b.getIndexType(),
+                                                  b.getIndexAttr(numTerms + 1));
+    auto step = lowerBound;
+
+    auto poly = adaptor.getPolynomial();
+    auto point = adaptor.getPoint();
+
+    // Horner's method:
+    //
+    // accum = 0
+    // for i = 1, 2, ..., N
+    //   accum = point * accum + coeff[N - i]
+    auto accum =
+        b.create<arith::ConstantOp>(b.getI32Type(), b.getI32IntegerAttr(0));
+    auto loop = b.create<scf::ForOp>(
+        lowerBound, numTermsOp, step, accum.getResult(),
+        [&](OpBuilder &builder, Location loc, Value loopIndex,
+            ValueRange loopState) {
+          ImplicitLocOpBuilder b(op.getLoc(), builder);
+          auto accum = loopState.front();
+          auto coeffIndex = b.create<arith::SubIOp>(numTermsOp, loopIndex);
+          auto mulOp = b.create<arith::MulIOp>(point, accum);
+          auto result = b.create<arith::AddIOp>(
+              mulOp, b.create<tensor::ExtractOp>(poly, coeffIndex.getResult()));
+          b.create<scf::YieldOp>(result.getResult());
+        });
+
+    rewriter.replaceOp(op, loop.getResult(0));
     return success();
   }
 };
@@ -136,7 +249,6 @@ struct ConvertConstant : public OpConversionPattern<ConstantOp> {
   }
 };
 
-
 struct PolyToStandard : impl::PolyToStandardBase<PolyToStandard> {
   using PolyToStandardBase::PolyToStandardBase;
 
@@ -150,8 +262,8 @@ struct PolyToStandard : impl::PolyToStandardBase<PolyToStandard> {
 
     RewritePatternSet patterns(context);
     PolyToStandardTypeConverter typeConverter(context);
-    patterns.add<ConvertAdd, ConvertConstant, ConvertSub, ConvertFromTensor,
-                 ConvertToTensor>(typeConverter, context);
+    patterns.add<ConvertAdd, ConvertConstant, ConvertSub, ConvertEval,
+                 ConvertMul, ConvertFromTensor, ConvertToTensor>(typeConverter, context);
 
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
