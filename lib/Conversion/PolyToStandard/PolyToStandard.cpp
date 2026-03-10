@@ -19,7 +19,7 @@ struct PolyToStandard : impl::PolyToStandardBase<PolyToStandard> {
     auto *module = getOperation();
     
     ConversionTarget target(*context);
-    target.addIllegalDialect<PolyDialect>();
+    target.addIllegalDialect<PolyDialect>();// 이 패스가 끝난 직후에 poly 연산이 단 하나라도 남아있으면 그것은 문법적 오류(Illegal)로 간주
 
     RewritePatternSet patterns(context);
 
